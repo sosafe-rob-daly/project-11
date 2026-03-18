@@ -45,3 +45,10 @@ input[type=range]{width:100%;accent-color:#534AB7}
 .leg{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px}
 .leg-i{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--tx2)}
 .leg-d{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.rm-btn{background:none;border:1px solid var(--bd);border-radius:4px;color:var(--tx3);cursor:pointer;font-size:16px;line-height:1;padding:1px 7px;flex-shrink:0}
+.rm-btn:hover{color:#d44;border-color:#d44}
+.add-role{display:flex;gap:8px;margin-top:4px}
+.add-role input[type=text]{flex:1;padding:7px 10px;font-size:13px;border:1px solid var(--bd);border-radius:6px;background:var(--bg2);color:var(--tx);font-family:inherit}
+.add-role input[type=text]::placeholder{color:var(--tx3)}
+.add-role button{padding:7px 14px;font-size:13px;font-weight:500;border:none;border-radius:6px;background:var(--c1);color:#fff;cursor:pointer;font-family:inherit;white-space:nowrap}
+.add-role button:hover{opacity:.85}

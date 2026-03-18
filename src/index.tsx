@@ -180,8 +180,18 @@ function Section({ title, color, children }: { title: string; color?: string; ch
 
 // ── Tab panels ─────────────────────────────────────────────────────────
 function TeamPanel({ roles, setRoles }: { roles: RoleDef[]; setRoles: (r: RoleDef[]) => void }) {
+  const [newLabel, setNewLabel] = useState("");
   const updateRole = (id: string, patch: Partial<RoleDef>) => {
     setRoles(roles.map((r) => r.id === id ? { ...r, ...patch } : r));
+  };
+  const removeRole = (id: string) => {
+    setRoles(roles.filter((r) => r.id !== id));
+  };
+  const addRole = () => {
+    const label = newLabel.trim() || "New Role";
+    const id = "custom_" + Date.now();
+    setRoles([...roles, { id, label, salary: 100000, startMonth: 6, include: true, fixed: false }]);
+    setNewLabel("");
   };
   const activeRoles = roles.filter((r) => r.include);
 
@@ -197,6 +207,9 @@ function TeamPanel({ roles, setRoles }: { roles: RoleDef[]; setRoles: (r: RoleDe
               <span className="rb">
                 {r.include ? `Joins M${r.startMonth} · ${13 - r.startMonth}mo` : "Not hired"}
               </span>
+              {!r.fixed && (
+                <button className="rm-btn" onClick={() => removeRole(r.id)} title="Remove role">&times;</button>
+              )}
             </div>
             {r.include && (
               <div className="rsl">
@@ -214,6 +227,11 @@ function TeamPanel({ roles, setRoles }: { roles: RoleDef[]; setRoles: (r: RoleDe
             )}
           </div>
         ))}
+        <div className="add-role">
+          <input type="text" placeholder="Role title..." value={newLabel} onChange={(e) => setNewLabel(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") addRole(); }} />
+          <button onClick={addRole}>+ Add role</button>
+        </div>
       </Section>
       <Section title="Hiring timeline">
         <div style={{ overflowX: "auto" }}>
