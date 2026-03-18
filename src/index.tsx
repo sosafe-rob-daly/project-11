@@ -320,7 +320,7 @@ function LegalPanel({ sliders, setSlider, c }: { sliders: SliderState; setSlider
   return (
     <>
       <Section title="Legal & compliance" color={C4}>
-        <Slider label="Entity setup (GmbH / subsidiary)" value={sliders.entitySetup} min={5000} max={30000} step={1000} display={fmt} onChange={(v) => setSlider("entitySetup", v)} />
+        <Slider label="Entity setup (subsidiary)" value={sliders.entitySetup} min={5000} max={30000} step={1000} display={fmt} onChange={(v) => setSlider("entitySetup", v)} />
         <Slider label="Employment contracts & HR legal" value={sliders.hrLegal} min={5000} max={40000} step={1000} display={fmt} onChange={(v) => setSlider("hrLegal", v)} />
         <Slider label="IP assignment agreements" value={sliders.ipAssign} min={2000} max={20000} step={500} display={fmt} onChange={(v) => setSlider("ipAssign", v)} />
         <Slider label="Patent filings (provisional)" value={sliders.patents} min={0} max={100000} step={5000} display={fmt} onChange={(v) => setSlider("patents", v)} />
