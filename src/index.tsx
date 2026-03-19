@@ -3,7 +3,9 @@ import * as echarts from "echarts";
 
 // ── Constants ──────────────────────────────────────────────────────────
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const TABS = ["Team & Hiring","Compensation","Infrastructure","Legal & Ops","Summary","Cash Burn"];
+const TABS = ["Team & Hiring","Compensation","Infrastructure","Legal & Ops","Summary","Revenue","Cash Burn"];
+const YEARS = ["Year 1", "Year 2", "Year 3"];
+const C6 = "#2E86C1";
 const C1 = "#534AB7", C2 = "#1D9E75", C3 = "#D85A30", C4 = "#BA7517", C5 = "#888780";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -40,6 +42,15 @@ interface CalcResult {
   total: number;
   monthly: MonthlyData[];
   cumulative: number[];
+}
+
+interface RevenueState {
+  baseY1: number;
+  baseY2: number;
+  baseY3: number;
+  stretchY1: number;
+  stretchY2: number;
+  stretchY3: number;
 }
 
 interface SliderState {
@@ -80,6 +91,11 @@ const DEFAULT_ROLES: RoleDef[] = [
   { id: "pm",       label: "Product Manager / Designer",salary: 105000, startMonth: 5,  include: true,  fixed: false },
   { id: "gtm",      label: "GTM / Growth (H2 hire)",    salary: 100000, startMonth: 9,  include: false, fixed: false },
 ];
+
+const DEFAULT_REVENUE: RevenueState = {
+  baseY1: 0, baseY2: 350000, baseY3: 1200000,
+  stretchY1: 250000, stretchY2: 750000, stretchY3: 2000000,
+};
 
 const DEFAULT_SLIDERS: SliderState = {
   socialPct: 22, bonusPct: 15, vsopSetup: 7500,
@@ -387,6 +403,110 @@ function SummaryPanel({ sliders, setSlider, c }: { sliders: SliderState; setSlid
   );
 }
 
+function RevenuePanel({ rev, setRev, c }: { rev: RevenueState; setRev: (r: RevenueState) => void; c: CalcResult }) {
+  const burnRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<echarts.ECharts | null>(null);
+
+  const setField = (k: keyof RevenueState, v: number) => setRev({ ...rev, [k]: v });
+
+  // Cost projections: Y1 from model, Y2 grows 15%, Y3 grows 10%
+  const costY1 = c.total;
+  const costY2 = costY1 * 1.15;
+  const costY3 = costY2 * 1.10;
+  const costs = [costY1, costY2, costY3];
+
+  const baseRev = [rev.baseY1, rev.baseY2, rev.baseY3];
+  const stretchRev = [rev.stretchY1, rev.stretchY2, rev.stretchY3];
+  const baseNet = baseRev.map((r, i) => r - costs[i]);
+  const stretchNet = stretchRev.map((r, i) => r - costs[i]);
+  const baseCumNet = baseNet.reduce<number[]>((acc, v) => [...acc, (acc.length ? acc[acc.length - 1] : 0) + v], []);
+  const stretchCumNet = stretchNet.reduce<number[]>((acc, v) => [...acc, (acc.length ? acc[acc.length - 1] : 0) + v], []);
+
+  useEffect(() => {
+    const dark = window.matchMedia("(prefers-color-scheme:dark)").matches;
+    const ax = dark ? "#777" : "#bbb", lbl = dark ? "#aaa" : "#777";
+    const tbg = dark ? "#2a2a2a" : "#fff", tbd = dark ? "#444" : "#ddd", ttx = dark ? "#eee" : "#111";
+
+    if (burnRef.current) {
+      chartRef.current?.dispose();
+      const chart = echarts.init(burnRef.current);
+      chartRef.current = chart;
+      chart.setOption({
+        backgroundColor: "transparent",
+        tooltip: {
+          trigger: "axis", backgroundColor: tbg, borderColor: tbd, textStyle: { color: ttx, fontSize: 12 },
+          formatter: (params: any) => {
+            let s = `<div style="font-size:12px;font-weight:500;margin-bottom:4px">${params[0].axisValue}</div>`;
+            params.forEach((p: any) => { s += `<div>${p.marker}${p.seriesName}: <strong>${fmt(p.value)}</strong></div>`; });
+            return s;
+          },
+        },
+        legend: { bottom: 0, textStyle: { color: lbl, fontSize: 11 }, itemWidth: 14, itemHeight: 10 },
+        grid: { left: 60, right: 12, top: 12, bottom: 40, containLabel: false },
+        xAxis: { type: "category", data: YEARS, axisLine: { lineStyle: { color: ax } }, axisTick: { show: false }, axisLabel: { color: lbl, fontSize: 11 } },
+        yAxis: { type: "value", axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: dark ? "#333" : "#eee" } }, axisLabel: { color: lbl, fontSize: 11, formatter: (v: number) => fmtK(v) } },
+        series: [
+          { name: "Costs", type: "bar", data: costs.map(Math.round), itemStyle: { color: C5 } },
+          { name: "Revenue (base)", type: "bar", data: baseRev.map(Math.round), itemStyle: { color: C1 } },
+          { name: "Revenue (stretch)", type: "bar", data: stretchRev.map(Math.round), itemStyle: { color: C6 } },
+        ],
+      });
+      const handleResize = () => chartRef.current?.resize();
+      window.addEventListener("resize", handleResize);
+      return () => { window.removeEventListener("resize", handleResize); chartRef.current?.dispose(); };
+    }
+  }, [rev, c]);
+
+  return (
+    <>
+      <Section title="Revenue assumptions — base case" color={C1}>
+        <p style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 8 }}>Conservative: Y1 build year (€0), first customers converting in Y2, repeatable motion in Y3.</p>
+        <Slider label="Year 1 revenue" value={rev.baseY1} min={0} max={500000} step={25000} display={fmt} onChange={(v) => setField("baseY1", v)} />
+        <Slider label="Year 2 revenue" value={rev.baseY2} min={0} max={2000000} step={25000} display={fmt} onChange={(v) => setField("baseY2", v)} />
+        <Slider label="Year 3 revenue" value={rev.baseY3} min={0} max={5000000} step={50000} display={fmt} onChange={(v) => setField("baseY3", v)} />
+      </Section>
+      <Section title="Revenue assumptions — stretch case" color={C6}>
+        <p style={{ fontSize: 11, color: "var(--tx3)", marginBottom: 8 }}>Aspirational: early design-partner revenue in Y1, aggressive expansion in Y2–Y3.</p>
+        <Slider label="Year 1 revenue" value={rev.stretchY1} min={0} max={1000000} step={25000} display={fmt} onChange={(v) => setField("stretchY1", v)} />
+        <Slider label="Year 2 revenue" value={rev.stretchY2} min={0} max={3000000} step={25000} display={fmt} onChange={(v) => setField("stretchY2", v)} />
+        <Slider label="Year 3 revenue" value={rev.stretchY3} min={0} max={5000000} step={100000} display={fmt} onChange={(v) => setField("stretchY3", v)} />
+      </Section>
+      <Section title="Revenue vs. cost" color={C1}>
+        <div ref={burnRef} style={{ height: 280, width: "100%" }} />
+      </Section>
+      <Section title="3-year P&L overview" color={C5}>
+        <div style={{ overflowX: "auto" }}>
+          <table className="dt">
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left" }}></th>
+                {YEARS.map((y) => <th key={y}>{y}</th>)}
+                <th>3yr total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Costs</td>{costs.map((v, i) => <td key={i}>{fmt(v)}</td>)}<td style={{ fontWeight: 500 }}>{fmt(costs.reduce((a, b) => a + b, 0))}</td></tr>
+              <tr style={{ borderTop: "1px solid var(--bd)" }}>
+                <td colSpan={5} style={{ fontWeight: 600, paddingTop: 8, paddingBottom: 4 }}>Base case</td>
+              </tr>
+              <tr><td style={{ paddingLeft: 12 }}>Revenue</td>{baseRev.map((v, i) => <td key={i}>{fmt(v)}</td>)}<td style={{ fontWeight: 500 }}>{fmt(baseRev.reduce((a, b) => a + b, 0))}</td></tr>
+              <tr><td style={{ paddingLeft: 12 }}>Net</td>{baseNet.map((v, i) => <td key={i} style={{ color: v < 0 ? "#D85A30" : C2 }}>{fmt(v)}</td>)}<td style={{ fontWeight: 500, color: baseNet.reduce((a, b) => a + b, 0) < 0 ? "#D85A30" : C2 }}>{fmt(baseNet.reduce((a, b) => a + b, 0))}</td></tr>
+              <tr><td style={{ paddingLeft: 12 }}>Cumulative</td>{baseCumNet.map((v, i) => <td key={i} style={{ color: v < 0 ? "#D85A30" : C2 }}>{fmt(v)}</td>)}<td /></tr>
+              <tr style={{ borderTop: "1px solid var(--bd)" }}>
+                <td colSpan={5} style={{ fontWeight: 600, paddingTop: 8, paddingBottom: 4 }}>Stretch case</td>
+              </tr>
+              <tr><td style={{ paddingLeft: 12 }}>Revenue</td>{stretchRev.map((v, i) => <td key={i}>{fmt(v)}</td>)}<td style={{ fontWeight: 500 }}>{fmt(stretchRev.reduce((a, b) => a + b, 0))}</td></tr>
+              <tr><td style={{ paddingLeft: 12 }}>Net</td>{stretchNet.map((v, i) => <td key={i} style={{ color: v < 0 ? "#D85A30" : C2 }}>{fmt(v)}</td>)}<td style={{ fontWeight: 500, color: stretchNet.reduce((a, b) => a + b, 0) < 0 ? "#D85A30" : C2 }}>{fmt(stretchNet.reduce((a, b) => a + b, 0))}</td></tr>
+              <tr><td style={{ paddingLeft: 12 }}>Cumulative</td>{stretchCumNet.map((v, i) => <td key={i} style={{ color: v < 0 ? "#D85A30" : C2 }}>{fmt(v)}</td>)}<td /></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style={{ fontSize: 11, color: "var(--tx3)", marginTop: 10 }}>Cost projection assumes Y2 +15% and Y3 +10% growth over the modelled Y1 total. Adjust revenue sliders to test scenarios.</p>
+      </Section>
+    </>
+  );
+}
+
 function BurnPanel({ c }: { c: CalcResult }) {
   const burnRef = useRef<HTMLDivElement>(null);
   const cumRef = useRef<HTMLDivElement>(null);
@@ -511,6 +631,7 @@ export default function CostModel() {
   const [tab, setTab] = useState(0);
   const [roles, setRoles] = useState<RoleDef[]>(DEFAULT_ROLES);
   const [sliders, setSliders] = useState<SliderState>(DEFAULT_SLIDERS);
+  const [revenue, setRevenue] = useState<RevenueState>(DEFAULT_REVENUE);
 
   const setSlider = useCallback((key: keyof SliderState, value: number) => {
     setSliders((prev) => ({ ...prev, [key]: value }));
@@ -558,7 +679,8 @@ export default function CostModel() {
       {tab === 2 && <InfraPanel sliders={sliders} setSlider={setSlider} c={c} />}
       {tab === 3 && <LegalPanel sliders={sliders} setSlider={setSlider} c={c} />}
       {tab === 4 && <SummaryPanel sliders={sliders} setSlider={setSlider} c={c} />}
-      {tab === 5 && <BurnPanel c={c} />}
+      {tab === 5 && <RevenuePanel rev={revenue} setRev={setRevenue} c={c} />}
+      {tab === 6 && <BurnPanel c={c} />}
     </>
   );
 }
